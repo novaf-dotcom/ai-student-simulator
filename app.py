@@ -17,7 +17,7 @@ def get_student_response(prompt):
         # Configure the Gemini client with the API key from Streamlit secrets
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
         # This is the crucial part: the system prompt that defines the AI's persona.
         student_persona = (
