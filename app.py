@@ -9,7 +9,10 @@ def get_ai_response(prompt, persona, chat_history=None):
     """
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        # --- THIS LINE IS UPDATED ---
+        # Switched to a more stable and widely available model
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         full_prompt = f"{persona}\n\n"
         
@@ -24,6 +27,7 @@ def get_ai_response(prompt, persona, chat_history=None):
         response = model.generate_content(full_prompt)
         return response.text if response and response.text else None
     except Exception as e:
+        # Provide a more detailed error message to the user
         st.error(f"An API error occurred: {e}")
         return None
 
