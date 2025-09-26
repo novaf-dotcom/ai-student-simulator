@@ -13,8 +13,8 @@ def get_ai_response(prompt, persona, chat_history=None):
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         # --- THIS LINE IS UPDATED ---
-        # Switched back to the 'flash' model to use a different, likely more generous, free quota.
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Switched to a different, highly stable model to resolve the 'not found' error.
+        model = genai.GenerativeModel('gemini-1.0-pro')
         
         full_prompt = f"{persona}\n\n"
         
