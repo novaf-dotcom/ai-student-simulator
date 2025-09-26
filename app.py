@@ -12,7 +12,9 @@ def get_ai_response(prompt, persona, chat_history=None):
     """
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        # --- THIS LINE IS UPDATED ---
+        # Switched back to the 'flash' model to use a different, likely more generous, free quota.
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
         full_prompt = f"{persona}\n\n"
         
