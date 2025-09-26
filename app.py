@@ -1,22 +1,21 @@
 import streamlit as st
 import google.generativeai as genai
+import time
+from google.api_core import exceptions
 
 # --- Core AI Functions ---
 
 def get_ai_response(prompt, persona, chat_history=None):
     """
     Generic function to get a response from the Gemini API with a specific persona.
+    Includes a retry mechanism for rate limiting errors.
     """
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        
-        # --- THIS LINE IS UPDATED ---
-        # Switched to a more stable and widely available model
         model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         full_prompt = f"{persona}\n\n"
         
-        # Add chat history for context, if available
         if chat_history:
             for message in chat_history:
                 role = "User" if message["role"] == "user" else "Student"
@@ -26,8 +25,19 @@ def get_ai_response(prompt, persona, chat_history=None):
 
         response = model.generate_content(full_prompt)
         return response.text if response and response.text else None
+
+    except exceptions.ResourceExhausted as e:
+        # This is a rate limit error, so we'll wait and retry once.
+        st.warning("API rate limit reached. Waiting 30 seconds before retrying...")
+        time.sleep(30)
+        try:
+            response = model.generate_content(full_prompt)
+            return response.text if response and response.text else None
+        except Exception as retry_e:
+            st.error(f"An API error occurred on retry: {retry_e}")
+            return None
+            
     except Exception as e:
-        # Provide a more detailed error message to the user
         st.error(f"An API error occurred: {e}")
         return None
 
@@ -61,10 +71,14 @@ st.markdown("Test whether you can spot AI-generated student answers that might n
 with st.sidebar:
     st.header("How It Works")
     st.write("1. You ask the 'AI Student' a question.")
-    st.write("2. The student, powered by Gemini, gives an answer. Sometimes its answer is genuine; sometimes it's written as if copied from another source.")
-    st.write("3. A second AI, the 'Integrity Checker,' analyzes the student's response for signs of plagiarism.")
+    st.write("2. The student, powered by Gemini, gives an answer.")
+    st.write("3. If enabled, a second AI analyzes the response for plagiarism.")
     st.write("4. The checker provides its verdict and reasoning.")
     st.info("Remember to add your Gemini API Key in the Streamlit Cloud settings!")
+    st.divider()
+    # New feature to control API usage
+    run_integrity_check = st.checkbox("Enable Academic Integrity Analysis", value=True, help="Uncheck this to use less of your API quota.")
+
 
 # Initialize chat history in session state
 if "messages" not in st.session_state:
@@ -80,7 +94,6 @@ for message in st.session_state.messages:
 
 # Get user input
 if prompt := st.chat_input("Ask the AI student a question..."):
-    # Add user message to history and display it
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -92,26 +105,31 @@ if prompt := st.chat_input("Ask the AI student a question..."):
             if student_response:
                 st.markdown(student_response)
                 
-                # Now, check the response for academic integrity
-                with st.spinner("Analyzing response for plagiarism..."):
-                    integrity_analysis = get_ai_response(student_response, INTEGRITY_CHECKER_PERSONA)
-                    if integrity_analysis:
-                        with st.expander("Show Academic Integrity Analysis"):
-                            st.warning(integrity_analysis)
-                        
-                        # Store the complete interaction in history
-                        st.session_state.messages.append({
-                            "role": "assistant", 
-                            "content": student_response,
-                            "analysis": integrity_analysis
-                        })
-                    else:
-                        st.error("The integrity checker could not provide an analysis.")
-                        # Store just the student response if analysis fails
-                        st.session_state.messages.append({
-                            "role": "assistant", 
-                            "content": student_response
-                        })
+                # Only run the integrity check if the checkbox is ticked
+                if run_integrity_check:
+                    with st.spinner("Analyzing response for plagiarism..."):
+                        integrity_analysis = get_ai_response(student_response, INTEGRITY_CHECKER_PERSONA)
+                        if integrity_analysis:
+                            with st.expander("Show Academic Integrity Analysis"):
+                                st.warning(integrity_analysis)
+                            
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": student_response,
+                                "analysis": integrity_analysis
+                            })
+                        else:
+                            st.error("The integrity checker could not provide an analysis.")
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": student_response
+                            })
+                else:
+                    # If the check is disabled, just store the student's response
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": student_response
+                    })
             else:
                 st.error("The AI student didn't provide a response.")
 
